@@ -1,0 +1,14 @@
+{
+  "name": "opencode-proxy",
+  "version": "1.0.0",
+  "description": "Proxy for OpenCode Zen API with model rotation",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": ["opencode", "zen", "proxy", "ai", "models"],
+  "license": "MIT"
+}
