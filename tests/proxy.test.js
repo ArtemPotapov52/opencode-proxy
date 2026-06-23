@@ -172,4 +172,87 @@ describe('createProxy', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.data.length, 2);
   });
+
+  it('should expose dashboard and metrics endpoints', async () => {
+    const { proxyRequest } = createProxy({
+      apiKey: 'key',
+      models: ['m1'],
+      upstream: 'https://test.com/v1',
+      timeout: 5000,
+    });
+
+    const dashboard = makeResponse();
+    await proxyRequest({ method: 'GET', url: '/dashboard' }, dashboard);
+    assert.equal(dashboard.statusCode, 200);
+    assert.match(dashboard.body, /OpenCode Proxy Dashboard/);
+
+    const metrics = makeResponse(true);
+    await proxyRequest({ method: 'GET', url: '/metrics?window=60000' }, metrics);
+    assert.equal(metrics.statusCode, 200);
+    assert.equal(metrics.body.summary.window.requests, 0);
+    assert.equal(metrics.body.privacy.stores_prompts, false);
+  });
+
+  it('should record privacy-safe metrics for chat completions', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      model: 'actual-model',
+      choices: [{ finish_reason: 'stop', message: { content: 'do not store me' } }],
+      usage: {
+        prompt_tokens: 11,
+        completion_tokens: 7,
+        total_tokens: 18,
+      },
+      cost: '0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+    try {
+      const { proxyRequest, metrics } = createProxy({
+        apiKey: 'key',
+        models: ['m1'],
+        upstream: 'https://test.com/v1',
+        timeout: 5000,
+      });
+
+      const req = makeJSONRequest('/v1/chat/completions', {
+        model: 'm1',
+        messages: [{ role: 'user', content: 'do not store me either' }],
+      });
+      const res = makeResponse();
+      await proxyRequest(req, res);
+
+      assert.equal(res.statusCode, 200);
+      const snapshot = metrics.snapshot({ windowMs: 60_000 });
+      assert.equal(snapshot.summary.window.requests, 1);
+      assert.equal(snapshot.summary.window.total_tokens, 18);
+      assert.equal(snapshot.summary.window.by_model[0].model, 'm1');
+      assert.equal(snapshot.recent[0].returned_model, 'actual-model');
+      assert.equal(JSON.stringify(snapshot).includes('do not store me'), false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
+
+function makeResponse(parseJSON = false) {
+  return {
+    headers: {},
+    writeHead(status, headers) {
+      this.statusCode = status;
+      if (headers) Object.assign(this.headers, headers);
+    },
+    end(data) {
+      this.body = parseJSON ? JSON.parse(data) : data;
+    },
+  };
+}
+
+function makeJSONRequest(url, body) {
+  return {
+    method: 'POST',
+    url,
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(JSON.stringify(body));
+    },
+  };
+}

@@ -19,6 +19,7 @@ function loadConfig() {
     upstream: process.env.UPSTREAM_URL || 'https://opencode.ai/zen/v1',
     routing: process.env.ROUTING || 'round-robin',
     timeout: parseInt(process.env.UPSTREAM_TIMEOUT || '30000', 10),
+    metricsMaxEvents: parseInt(process.env.METRICS_MAX_EVENTS || '2000', 10),
   };
 }
 

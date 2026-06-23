@@ -9,6 +9,7 @@ This project should stay small, local-first, and safe by default. The goal is to
 - Daily proxy + Desktop launcher through `open-opencode.cmd`.
 - Safe default network binding to `127.0.0.1`.
 - Diagnostic checks through `doctor.cmd`.
+- Local privacy-safe analytics through `/dashboard` and `/metrics`.
 - OpenCode Desktop configuration through a dedicated `zenproxy` provider.
 
 ## Useful patterns from nearby projects
@@ -37,7 +38,7 @@ From `abtop`:
 ## Phase 2: reduce manual runtime work
 
 - Add a background launcher option for Windows.
-- Add a small local status page at `http://127.0.0.1:3000`.
+- Add richer dashboard filters and export options for `http://127.0.0.1:3000/dashboard`.
 - Add graceful port fallback, for example `3000 -> 3001 -> 3002`, and update OpenCode config automatically.
 - Add a backup/restore command for OpenCode config.
 - Add optional Windows startup registration, disabled by default.

@@ -109,6 +109,20 @@ big-pickle
 .\model-health.cmd --fail-on warning
 ```
 
+Локальная панель аналитики:
+
+```text
+http://127.0.0.1:3000/dashboard
+```
+
+JSON-метрики для автоматизации:
+
+```text
+http://127.0.0.1:3000/metrics
+```
+
+Dashboard показывает запросы, токены/минуту, среднюю задержку, ошибки и разбивку по моделям. Он хранит только in-memory метрики: модель, статус, latency, usage tokens, cost и класс ошибки. Промпты, ответы, ключи и пути проектов не сохраняются.
+
 ### Ручной запуск
 
 ```powershell
@@ -120,6 +134,7 @@ npm start
 ```powershell
 Invoke-RestMethod http://127.0.0.1:3000/health
 Invoke-RestMethod http://127.0.0.1:3000/v1/models
+Invoke-RestMethod http://127.0.0.1:3000/metrics
 ```
 
 ### Конфиг
@@ -153,6 +168,8 @@ http://127.0.0.1:3010/v1
 
 - Proxy по умолчанию слушает только `127.0.0.1`, а не всю локальную сеть.
 - `GET /health` показывает статус proxy.
+- `GET /dashboard` показывает локальную dashboard-панель.
+- `GET /metrics` возвращает privacy-safe JSON-метрики.
 - `GET /v1/models` возвращает локальный список моделей.
 - `POST /v1/chat/completions` принимает OpenAI-format запрос и пересылает его в OpenCode Zen.
 - Если `model` не указан, равен `auto`, или отсутствует в локальном пуле, proxy выбирает следующую модель по `round-robin`.
@@ -273,6 +290,20 @@ Check which free models are actually responding now:
 .\model-health.cmd --fail-on warning
 ```
 
+Local analytics dashboard:
+
+```text
+http://127.0.0.1:3000/dashboard
+```
+
+JSON metrics for automation:
+
+```text
+http://127.0.0.1:3000/metrics
+```
+
+The dashboard shows requests, tokens/minute, average latency, errors, and per-model breakdowns. It stores only in-memory metrics: model, status, latency, usage tokens, cost, and error class. It does not store prompts, responses, keys, or project paths.
+
 ### Manual run
 
 ```bash
@@ -284,6 +315,7 @@ Health checks:
 ```bash
 curl http://127.0.0.1:3000/health
 curl http://127.0.0.1:3000/v1/models
+curl http://127.0.0.1:3000/metrics
 ```
 
 ### Config
