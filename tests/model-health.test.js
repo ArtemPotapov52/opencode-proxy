@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { errorMessage, normalizeBaseURL, summarize } from '../scripts/model-health.mjs';
+import { errorMessage, normalizeBaseURL, shouldFail, summarize } from '../scripts/model-health.mjs';
 
 describe('model-health', () => {
   it('normalizes trailing slash in base URL', () => {
@@ -25,5 +25,12 @@ describe('model-health', () => {
     assert.equal(errorMessage({ error: 'timeout' }), 'timeout');
     assert.equal(errorMessage({ status: 401, body: { error: { message: 'unauthorized' } } }), 'unauthorized');
     assert.equal(errorMessage({ status: 500, body: { raw: 'oops' } }), 'oops');
+  });
+
+  it('treats partial model failure as warning by default', () => {
+    assert.equal(shouldFail({ ok: 1, fail: 1 }, 'fail'), false);
+    assert.equal(shouldFail({ ok: 1, fail: 1 }, 'warning'), true);
+    assert.equal(shouldFail({ ok: 0, fail: 2 }, 'fail'), true);
+    assert.equal(shouldFail({ ok: 0, fail: 2 }, 'never'), false);
   });
 });

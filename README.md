@@ -43,7 +43,7 @@ big-pickle
 Требуется Node.js 18+.
 
 1. Скачайте или клонируйте репозиторий.
-2. Запустите:
+2. Один раз выполните первичную настройку:
 
 ```powershell
 .\run-opencode-proxy.cmd
@@ -53,6 +53,14 @@ big-pickle
 
 3. Перезапустите OpenCode Desktop.
 4. В выборе моделей используйте `Local Zen Proxy`.
+
+После первичной настройки для обычного ежедневного запуска используйте:
+
+```powershell
+.\open-opencode.cmd
+```
+
+Этот launcher проверит proxy, при необходимости запустит его в отдельном окне, дождется `/health`, а потом откроет OpenCode Desktop. Это самый простой способ избежать `ECONNREFUSED 127.0.0.1:3000`.
 
 ### Раздельная настройка
 
@@ -76,6 +84,12 @@ big-pickle
 .\start-proxy.cmd
 ```
 
+Или запускайте proxy и OpenCode Desktop вместе:
+
+```powershell
+.\open-opencode.cmd
+```
+
 ### Диагностика
 
 Если что-то не работает:
@@ -92,6 +106,7 @@ big-pickle
 .\model-health.cmd
 .\model-health.cmd --compact
 .\model-health.cmd --json
+.\model-health.cmd --fail-on warning
 ```
 
 ### Ручной запуск
@@ -194,7 +209,7 @@ This is not a subscription bypass or guaranteed unlimited access. Free-model ava
 Requires Node.js 18+.
 
 1. Download or clone this repository.
-2. Run:
+2. Run the first-time setup:
 
 ```powershell
 .\run-opencode-proxy.cmd
@@ -204,6 +219,14 @@ The script configures OpenCode Desktop first, then starts the local proxy. Keep 
 
 3. Restart OpenCode Desktop.
 4. Pick models from `Local Zen Proxy`.
+
+After the first-time setup, use this daily launcher:
+
+```powershell
+.\open-opencode.cmd
+```
+
+It checks the proxy, starts it in a separate window if needed, waits for `/health`, and then opens OpenCode Desktop. This is the easiest way to avoid `ECONNREFUSED 127.0.0.1:3000`.
 
 ### Separate setup
 
@@ -227,6 +250,12 @@ Then start the proxy:
 .\start-proxy.cmd
 ```
 
+Or start the proxy and OpenCode Desktop together:
+
+```powershell
+.\open-opencode.cmd
+```
+
 ### Diagnostics
 
 ```powershell
@@ -241,6 +270,7 @@ Check which free models are actually responding now:
 .\model-health.cmd
 .\model-health.cmd --compact
 .\model-health.cmd --json
+.\model-health.cmd --fail-on warning
 ```
 
 ### Manual run

@@ -6,6 +6,7 @@ This project should stay small, local-first, and safe by default. The goal is to
 
 - Local OpenAI-compatible proxy for OpenCode Zen free models.
 - One-command Windows setup through `run-opencode-proxy.cmd`.
+- Daily proxy + Desktop launcher through `open-opencode.cmd`.
 - Safe default network binding to `127.0.0.1`.
 - Diagnostic checks through `doctor.cmd`.
 - OpenCode Desktop configuration through a dedicated `zenproxy` provider.

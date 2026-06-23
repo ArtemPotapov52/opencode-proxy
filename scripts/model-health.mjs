@@ -2,6 +2,7 @@ function parseArgs(argv) {
   const options = {
     baseURL: process.env.OPENCODE_PROXY_BASE_URL || 'http://127.0.0.1:3000/v1',
     timeout: Number(process.env.OPENCODE_PROXY_HEALTH_TIMEOUT || 20_000),
+    failOn: process.env.OPENCODE_PROXY_HEALTH_FAIL_ON || 'fail',
     json: false,
     compact: false,
     models: [],
@@ -16,6 +17,7 @@ function parseArgs(argv) {
 
     if (arg === '--base-url') options.baseURL = next();
     else if (arg === '--timeout') options.timeout = Number(next());
+    else if (arg === '--fail-on') options.failOn = next();
     else if (arg === '--model') options.models.push(next());
     else if (arg === '--json') options.json = true;
     else if (arg === '--compact') options.compact = true;
@@ -30,6 +32,9 @@ function parseArgs(argv) {
   if (!Number.isFinite(options.timeout) || options.timeout <= 0) {
     throw new Error('--timeout must be a positive number of milliseconds');
   }
+  if (!['warning', 'fail', 'never'].includes(options.failOn)) {
+    throw new Error('--fail-on must be one of: warning, fail, never');
+  }
 
   return options;
 }
@@ -41,6 +46,7 @@ Options:
   --base-url <url>   OpenAI-compatible base URL, default: http://127.0.0.1:3000/v1
   --model <id>       Test only this model. May be passed more than once
   --timeout <ms>     Per-model timeout, default: 20000
+  --fail-on <level>  Exit non-zero on warning, fail, or never. Default: fail
   --json             Print JSON
   --compact          Print one-line status
 `);
@@ -184,6 +190,12 @@ function printCompact(summary, results) {
   }
 }
 
+function shouldFail(summary, failOn) {
+  if (failOn === 'never') return false;
+  if (failOn === 'warning') return summary.fail > 0;
+  return summary.ok === 0;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const baseURL = normalizeBaseURL(options.baseURL);
@@ -207,7 +219,7 @@ async function main() {
     printHuman(baseURL, summary, results);
   }
 
-  process.exitCode = summary.fail > 0 ? 1 : 0;
+  process.exitCode = shouldFail(summary, options.failOn) ? 1 : 0;
 }
 
 const executedFile = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
@@ -221,6 +233,7 @@ if (executedFile) {
 export {
   errorMessage,
   normalizeBaseURL,
+  shouldFail,
   summarize,
 };
 import { fileURLToPath } from 'node:url';
