@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "setup:opencode": "node scripts/setup-opencode.mjs",
     "test": "node --test tests/*.test.js"
   },
   "keywords": ["opencode", "zen", "proxy", "ai", "models"],

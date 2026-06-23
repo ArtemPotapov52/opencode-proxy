@@ -1,120 +1,213 @@
 # opencode-proxy
 
-**[English](#english) · [Русский](#russian)**
+OpenAI-compatible local proxy for OpenCode Zen free models. It runs on your machine, exposes `http://127.0.0.1:3000/v1`, and lets OpenCode Desktop use a small free-model pool through a dedicated `Local Zen Proxy` provider.
 
-OpenAI-compatible proxy for OpenCode Zen. Rotates models on each request. Zero dependencies, Node ≥ 18.
-
----
-
-<a id="english"></a>
-## English
-
-### Run
-
-Free models (no key needed):
-```bash
-npm start
-```
-
-Paid models:
-```bash
-export OPENCODE_ZEN_API_KEY=sk-zen-...
-npm start
-```
-
-Listens on `http://localhost:3000`.
-
-### Auth
-
-The proxy itself has no auth — anything reaching the port can use it. Upstream auth is a single header `Authorization: Bearer <OPENCODE_ZEN_API_KEY>`, defaulting to `public` for free models.
-
-### Endpoints
-
-- `POST /v1/chat/completions` — proxy (OpenAI format)
-- `GET /v1/models` — pool list
-- `GET /health` — status
-
-### Model selection
-
-The `model` field in the request decides:
-- omitted / `"auto"` / not in pool → next model in rotation
-- in pool → that exact model
-
-The chosen model is rewritten into the request and returned in the `X-Model-Used` header. `round-robin` (default) or `random`.
-
-### Config (env vars)
-
-| Var | Default |
-|---|---|
-| `OPENCODE_ZEN_API_KEY` | `public` |
-| `PORT` | `3000` |
-| `MODELS` | 5 free models (comma-separated) |
-| `ROUTING` | `round-robin` (or `random`) |
-| `UPSTREAM_URL` | `https://opencode.ai/zen/v1` |
-| `UPSTREAM_TIMEOUT` | `30000` (ms) |
-
-Default models: `big-pickle`, `deepseek-v4-flash-free`, `mimo-v2.5-free`, `north-mini-code-free`, `nemotron-3-ultra-free`.
-
-### Tests
-
-```bash
-npm test
-```
-
-MIT.
+**English**: see [English setup](#english-setup).  
+**Русский**: см. [Русская инструкция](#russian-setup).
 
 ---
 
-<a id="russian"></a>
-## Русский
+<a id="russian-setup"></a>
+## Русская инструкция
 
-### Запуск
+### Что это делает
 
-Бесплатные модели (ключ не нужен):
-```bash
+Проект поднимает локальный OpenAI-compatible endpoint:
+
+```text
+http://127.0.0.1:3000/v1
+```
+
+OpenCode Desktop подключается к нему как к провайдеру `Local Zen Proxy`, а proxy пересылает запросы в:
+
+```text
+https://opencode.ai/zen/v1
+```
+
+По умолчанию используется ключ `public` и бесплатный пул моделей:
+
+```text
+deepseek-v4-flash-free
+mimo-v2.5-free
+north-mini-code-free
+nemotron-3-ultra-free
+big-pickle
+```
+
+Это не обход подписки и не вечный безлимит. Доступность free-моделей зависит от OpenCode Zen.
+
+### Быстрая настройка для Windows
+
+Требуется Node.js 18+.
+
+1. Скачайте или клонируйте репозиторий.
+2. Запустите:
+
+```powershell
+.\install-opencode.cmd
+```
+
+Скрипт:
+
+- создаст или обновит `%USERPROFILE%\.config\opencode\opencode.jsonc`;
+- сделает бэкап текущего конфига рядом с файлом;
+- добавит провайдера `zenproxy`;
+- установит пакет `@ai-sdk/openai-compatible`;
+- выставит модели `zenproxy/deepseek-v4-flash-free` и `zenproxy/mimo-v2.5-free`.
+
+3. Запустите proxy:
+
+```powershell
+.\start-proxy.cmd
+```
+
+Окно proxy должно оставаться открытым, пока вы работаете в OpenCode Desktop.
+
+4. Перезапустите OpenCode Desktop.
+5. В выборе моделей используйте `Local Zen Proxy`.
+
+### Ручной запуск
+
+```powershell
 npm start
 ```
 
-Платные модели:
-```bash
-export OPENCODE_ZEN_API_KEY=sk-zen-...
-npm start
+Проверка:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/health
+Invoke-RestMethod http://127.0.0.1:3000/v1/models
 ```
 
-Слушает на `http://localhost:3000`.
+### Конфиг
 
-### Авторизация
-
-У самого прокси авторизации нет — кто достучится до порта, тот и пользуется. Наверх уходит один заголовок `Authorization: Bearer <OPENCODE_ZEN_API_KEY>`, по умолчанию `public` для бесплатных моделей.
-
-### Эндпоинты
-
-- `POST /v1/chat/completions` — прокси (формат OpenAI)
-- `GET /v1/models` — список пула
-- `GET /health` — статус
-
-### Выбор модели
-
-Поле `model` в запросе решает:
-- не указано / `"auto"` / нет в пуле → следующая модель по ротации
-- есть в пуле → ровно эта модель
-
-Выбранная модель переписывается в запрос и возвращается в заголовке `X-Model-Used`. `round-robin` (по умолчанию) или `random`.
-
-### Конфиг (env)
+Переменные окружения:
 
 | Переменная | По умолчанию |
 |---|---|
 | `OPENCODE_ZEN_API_KEY` | `public` |
 | `PORT` | `3000` |
-| `MODELS` | 5 бесплатных моделей (через запятую) |
-| `ROUTING` | `round-robin` (или `random`) |
+| `MODELS` | free-модели через запятую |
+| `ROUTING` | `round-robin` или `random` |
 | `UPSTREAM_URL` | `https://opencode.ai/zen/v1` |
-| `UPSTREAM_TIMEOUT` | `30000` (мс) |
+| `UPSTREAM_TIMEOUT` | `30000` мс |
 
-Модели по умолчанию: `big-pickle`, `deepseek-v4-flash-free`, `mimo-v2.5-free`, `north-mini-code-free`, `nemotron-3-ultra-free`.
+Пример с конкретным портом:
 
-### Тесты
+```powershell
+$env:PORT = "3010"
+npm start
+```
+
+Тогда OpenCode provider base URL должен быть:
+
+```text
+http://127.0.0.1:3010/v1
+```
+
+### Как это работает
+
+- `GET /health` показывает статус proxy.
+- `GET /v1/models` возвращает локальный список моделей.
+- `POST /v1/chat/completions` принимает OpenAI-format запрос и пересылает его в OpenCode Zen.
+- Если `model` не указан, равен `auto`, или отсутствует в локальном пуле, proxy выбирает следующую модель по `round-robin`.
+- Если `model` есть в пуле, используется именно она.
+- Выбранная модель возвращается в заголовке `X-Model-Used`.
+
+### Почему не Rust
+
+Текущая версия уже без npm-зависимостей: только Node.js 18+ и встроенные `http`/`fetch`. Для коллег это проще, чем собирать бинарники.
+
+Rust-версия возможна как следующий этап: один `.exe`, автозапуск и tray/служба. Но для HTTPS, JSON и OpenAI-compatible proxy всё равно понадобятся crates, просто они будут запакованы в бинарник. Практичный первый шаг — автоматическая настройка OpenCode плюс простой запуск proxy.
+
+---
+
+<a id="english-setup"></a>
+## English setup
+
+### What it does
+
+The project starts a local OpenAI-compatible endpoint:
+
+```text
+http://127.0.0.1:3000/v1
+```
+
+OpenCode Desktop can use it as a `Local Zen Proxy` provider. The proxy forwards requests to:
+
+```text
+https://opencode.ai/zen/v1
+```
+
+Default auth is `public`, with this free-model pool:
+
+```text
+deepseek-v4-flash-free
+mimo-v2.5-free
+north-mini-code-free
+nemotron-3-ultra-free
+big-pickle
+```
+
+This is not a subscription bypass or guaranteed unlimited access. Free-model availability is controlled by OpenCode Zen.
+
+### Quick Windows setup
+
+Requires Node.js 18+.
+
+1. Download or clone this repository.
+2. Run:
+
+```powershell
+.\install-opencode.cmd
+```
+
+The script:
+
+- creates or updates `%USERPROFILE%\.config\opencode\opencode.jsonc`;
+- creates a timestamped backup next to the config file;
+- adds a `zenproxy` provider;
+- installs `@ai-sdk/openai-compatible`;
+- sets the default models to `zenproxy/deepseek-v4-flash-free` and `zenproxy/mimo-v2.5-free`.
+
+3. Start the proxy:
+
+```powershell
+.\start-proxy.cmd
+```
+
+Keep this window open while using OpenCode Desktop.
+
+4. Restart OpenCode Desktop.
+5. Pick models from `Local Zen Proxy`.
+
+### Manual run
+
+```bash
+npm start
+```
+
+Health checks:
+
+```bash
+curl http://127.0.0.1:3000/health
+curl http://127.0.0.1:3000/v1/models
+```
+
+### Config
+
+Environment variables:
+
+| Variable | Default |
+|---|---|
+| `OPENCODE_ZEN_API_KEY` | `public` |
+| `PORT` | `3000` |
+| `MODELS` | comma-separated free models |
+| `ROUTING` | `round-robin` or `random` |
+| `UPSTREAM_URL` | `https://opencode.ai/zen/v1` |
+| `UPSTREAM_TIMEOUT` | `30000` ms |
+
+### Tests
 
 ```bash
 npm test
