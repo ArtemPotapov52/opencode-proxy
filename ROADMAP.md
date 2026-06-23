@@ -10,13 +10,28 @@ This project should stay small, local-first, and safe by default. The goal is to
 - Diagnostic checks through `doctor.cmd`.
 - OpenCode Desktop configuration through a dedicated `zenproxy` provider.
 
+## Useful patterns from nearby projects
+
+From `neurogate-limit-watch`:
+
+- `--json` and `--compact` outputs for automation, widgets, and quick support.
+- A no-secret diagnostic flow that checks environment, config, and live health.
+- Windows `.cmd` helpers that keep the console open for double-click users.
+- Release archives that include helper scripts and examples.
+
+From `abtop`:
+
+- Privacy-safe status summaries that avoid local paths, prompts, session IDs, and chat text.
+- Read-only local monitoring first; no API keys for local process/session views.
+- Optional JSON snapshots for dashboards without forcing a full UI upfront.
+
 ## Phase 1: make sharing painless
 
 - Publish a GitHub release zip with only the files users need.
 - Add a short Russian quickstart at the top of the release notes.
 - Add screenshots showing the expected `Local Zen Proxy` model picker.
 - Add a troubleshooting table for npm DNS failures, missing Node.js, busy port `3000`, and OpenCode config parse errors.
-- Add a model-health command that tests each configured free model and prints which ones are usable today.
+- Keep improving `model-health`, which tests each configured free model and prints which ones are usable today.
 
 ## Phase 2: reduce manual runtime work
 

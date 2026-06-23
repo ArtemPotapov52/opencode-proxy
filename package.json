@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "doctor": "node scripts/doctor.mjs",
+    "model-health": "node scripts/model-health.mjs",
     "setup:opencode": "node scripts/setup-opencode.mjs",
     "test": "node --test tests/*.test.js"
   },

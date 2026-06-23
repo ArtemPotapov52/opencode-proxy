@@ -86,6 +86,14 @@ big-pickle
 
 Он проверит Node.js, пакет `@ai-sdk/openai-compatible`, конфиг OpenCode, default-модель, `/health` и `/v1/models`.
 
+Проверить, какие free-модели реально отвечают сейчас:
+
+```powershell
+.\model-health.cmd
+.\model-health.cmd --compact
+.\model-health.cmd --json
+```
+
 ### Ручной запуск
 
 ```powershell
@@ -226,6 +234,14 @@ Then start the proxy:
 ```
 
 It checks Node.js, `@ai-sdk/openai-compatible`, OpenCode config, default model, `/health`, and `/v1/models`.
+
+Check which free models are actually responding now:
+
+```powershell
+.\model-health.cmd
+.\model-health.cmd --compact
+.\model-health.cmd --json
+```
 
 ### Manual run
 
