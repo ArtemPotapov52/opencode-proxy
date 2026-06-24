@@ -1,6 +1,6 @@
 import { loadConfig } from './config.js';
 import { renderDashboard } from './dashboard.js';
-import { ProxyMetrics, extractLimitFromHeaders, extractUsageFromBody } from './metrics.js';
+import { ProxyMetrics, extractLimitFromHeaders, extractUsageFromBody, extractUsageFromText, withEstimatedUsage } from './metrics.js';
 import { Router } from './router.js';
 import { UsageStore } from './usage_store.js';
 
@@ -136,7 +136,10 @@ function createProxy(customConfig) {
 
       const text = await response.text();
       const parsedResponse = safeParseJSON(text);
-      const usage = extractUsageFromBody(parsedResponse);
+      const rawUsage = parsedResponse
+        ? extractUsageFromBody(parsedResponse)
+        : extractUsageFromText(text);
+      const usage = withEstimatedUsage(rawUsage, parsed, text, parsedResponse);
       const limit = extractLimitFromHeaders(response.headers, response.status, Date.now());
       metrics.record({
         model: selectedModel,

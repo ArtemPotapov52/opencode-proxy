@@ -119,6 +119,9 @@ function sanitizeUsageEvent(event = {}) {
     total_tokens: nonNegativeInteger(event.total_tokens),
     prompt_tokens: nonNegativeInteger(event.prompt_tokens),
     completion_tokens: nonNegativeInteger(event.completion_tokens),
+    usage_reported: Boolean(event.usage_reported),
+    usage_estimated: Boolean(event.usage_estimated),
+    usage_source: cleanString(event.usage_source || '', 40),
     cost: numberOrNull(event.cost),
     rate_limited: Boolean(event.rate_limited || status === 429),
     retry_after_seconds: nonNegativeNumberOrNull(event.retry_after_seconds),
@@ -239,6 +242,8 @@ function emptyUsageAggregate(model = '') {
     total_tokens: 0,
     prompt_tokens: 0,
     completion_tokens: 0,
+    usage_reported: 0,
+    usage_estimated: 0,
     cost: 0,
     rate_limited: 0,
     latency_ms_sum: 0,
@@ -258,6 +263,8 @@ function addUsageEvent(aggregate, event) {
   aggregate.total_tokens += event.total_tokens || 0;
   aggregate.prompt_tokens += event.prompt_tokens || 0;
   aggregate.completion_tokens += event.completion_tokens || 0;
+  if (event.usage_reported) aggregate.usage_reported += 1;
+  if (event.usage_estimated) aggregate.usage_estimated += 1;
   aggregate.cost += event.cost || 0;
   if (event.rate_limited) aggregate.rate_limited += 1;
   aggregate.latency_ms_sum += event.latency_ms || 0;

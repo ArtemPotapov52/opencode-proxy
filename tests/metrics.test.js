@@ -6,8 +6,10 @@ import {
   currentLimits,
   extractLimitFromHeaders,
   extractUsageFromBody,
+  extractUsageFromText,
   parseRetryAfter,
   parseResetHeader,
+  withEstimatedUsage,
 } from '../src/metrics.js';
 
 describe('ProxyMetrics', () => {
@@ -47,9 +49,56 @@ describe('ProxyMetrics', () => {
       total_tokens: 15,
       prompt_tokens: 10,
       completion_tokens: 5,
+      usage_reported: true,
+      usage_estimated: false,
+      usage_source: 'api',
       cost: 0,
     });
     assert.equal(Object.hasOwn(usage, 'content'), false);
+  });
+
+  it('extracts usage from streaming SSE text without storing content', () => {
+    const text = [
+      'data: {"model":"stream-model","choices":[{"delta":{"content":"secret chunk"}}]}',
+      'data: {"choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":6,"total_tokens":10}}',
+      'data: [DONE]',
+      '',
+    ].join('\n');
+
+    const usage = extractUsageFromText(text);
+    assert.deepEqual(usage, {
+      returned_model: 'stream-model',
+      finish_reason: 'stop',
+      total_tokens: 10,
+      prompt_tokens: 4,
+      completion_tokens: 6,
+      usage_reported: true,
+      usage_estimated: false,
+      usage_source: 'api',
+      cost: null,
+    });
+    assert.equal(JSON.stringify(usage).includes('secret chunk'), false);
+  });
+
+  it('estimates usage from request and response text when upstream omits usage', () => {
+    const raw = extractUsageFromBody({
+      model: 'deepseek-v4-flash',
+      choices: [{ finish_reason: 'stop', message: { content: 'answer text' } }],
+    });
+    const usage = withEstimatedUsage(
+      raw,
+      { messages: [{ role: 'user', content: 'a'.repeat(40) }] },
+      '',
+      { choices: [{ message: { content: 'b'.repeat(20) } }] },
+    );
+
+    assert.equal(usage.usage_reported, false);
+    assert.equal(usage.usage_estimated, true);
+    assert.equal(usage.usage_source, 'estimate_chars');
+    assert.equal(usage.prompt_tokens, 10);
+    assert.equal(usage.completion_tokens, 5);
+    assert.equal(usage.total_tokens, 15);
+    assert.equal(JSON.stringify(usage).includes('aaaa'), false);
   });
 
   it('caps retained events', () => {

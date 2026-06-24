@@ -70,6 +70,71 @@ cd C:\project\opencode
 
 Этот launcher проверит proxy, при необходимости запустит его в отдельном окне, дождется `/health`, а потом откроет OpenCode Desktop. Это самый простой способ избежать `ECONNREFUSED 127.0.0.1:3000`.
 
+### Factory Droid / Mission / Validation
+
+Factory Droid тоже может работать через этот proxy как BYOK/custom OpenAI-compatible model. Это полезно, когда подписка Factory-managed models закончилась, но Factory разрешает использовать свои custom models.
+
+1. Установите Factory Desktop/Droid: [factory.ai/product/desktop](https://factory.ai/product/desktop) или CLI по инструкции [docs.factory.ai](https://docs.factory.ai/cli/getting-started/quickstart).
+2. Запустите локальный proxy:
+
+```powershell
+.\start-proxy.cmd
+```
+
+3. Закройте Factory Desktop/Droid, чтобы он перечитал конфиги после настройки.
+4. Выполните:
+
+```powershell
+.\setup-factory-droid.cmd
+```
+
+Скрипт обновит:
+
+- `%USERPROFILE%\.factory\settings.json`;
+- `%USERPROFILE%\.factory\factory-settings.json`;
+- уже созданные `%USERPROFILE%\.factory\missions\*\model-settings.json`, если они есть.
+
+Он добавит 4 OpenCode Proxy модели:
+
+```text
+deepseek-v4-flash-free [OpenCode Proxy]
+mimo-v2.5-free [OpenCode Proxy]
+north-mini-code-free [OpenCode Proxy]
+nemotron-3-ultra-free [OpenCode Proxy]
+```
+
+По умолчанию:
+
+- обычный чат: `deepseek-v4-flash-free`;
+- Mission worker: `mimo-v2.5-free`;
+- Validation worker: `deepseek-v4-flash-free`;
+- reasoning для Mission/Validation: `none`, чтобы не отправлять лишние параметры в бесплатный OpenAI-compatible endpoint.
+
+После этого снова откройте Factory. В обычном чате и в Mission должны появиться модели с пометкой `[OpenCode Proxy]`.
+
+Если в уже созданной Mission validation всё ещё показывает старую модель, проверьте файл:
+
+```text
+%USERPROFILE%\.factory\missions\<mission-id>\model-settings.json
+```
+
+Там должны быть такие значения:
+
+```json
+{
+  "workerModel": "custom:opencode-mimo-v2-5-free",
+  "workerReasoningEffort": "none",
+  "validationWorkerModel": "custom:opencode-deepseek-v4-flash-free",
+  "validationWorkerReasoningEffort": "none"
+}
+```
+
+Для проверки proxy:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/health
+```
+
 ### Раздельная настройка
 
 Если нужно выполнить шаги отдельно:
@@ -141,7 +206,7 @@ http://127.0.0.1:3000/usage?days=7
 http://127.0.0.1:3000/limits
 ```
 
-Dashboard показывает 4 основные модели, запросы, токены/минуту, среднюю задержку, ошибки, расход по дням и лимиты. Когда upstream отдаёт `Retry-After`, reset headers или remaining/limit headers, dashboard показывает эти значения. Если upstream не отдаёт точный остаток, отображается `API не передал`, а суточный расход считается по локальной истории.
+Dashboard показывает 4 основные модели, запросы, токены/минуту, среднюю задержку, ошибки, расход по дням и лимиты. Когда upstream отдаёт `Retry-After`, reset headers или remaining/limit headers, dashboard показывает эти значения. Если upstream не отдаёт точный остаток, отображается `API не передал`, а суточный расход считается по локальной истории. Если upstream не отдаёт `usage`, proxy считает приблизительные токены по длине запроса/ответа и показывает их с префиксом `≈`.
 
 История по умолчанию пишется в:
 
@@ -218,6 +283,15 @@ http://127.0.0.1:3010/v1
 
 Rust-версия возможна как следующий этап: один `.exe` launcher/doctor, автозапуск и tray/служба. Но для HTTPS, JSON и OpenAI-compatible proxy всё равно понадобятся crates, просто они будут запакованы в бинарник. Практичный первый шаг — автоматическая настройка OpenCode плюс простой запуск proxy.
 
+### Что можно улучшить дальше
+
+- Release zip без бинарников: только исходники, `.cmd`, `.ps1`, README и тесты. Это прозрачнее для коллег, чем неизвестный `.exe`.
+- Защищенный серверный fallback через `ssh -L`, если локальная сеть/DNS иногда ломает доступ.
+- Экспорт dashboard в JSON/CSV для отчета по расходу.
+- Автоочистка старой истории `%USERPROFILE%\.config\opencode-proxy\usage.jsonl`.
+- Калибровка примерной оценки токенов, когда upstream не возвращает `usage`.
+- Optional Rust helper позже: только launcher/doctor, а не обязательный способ установки.
+
 ### Риски и ограничения
 
 - Это локальный proxy без собственной авторизации, поэтому по умолчанию он привязан к `127.0.0.1`.
@@ -289,6 +363,71 @@ After the first-time setup, use this daily launcher:
 
 It checks the proxy, starts it in a separate window if needed, waits for `/health`, and then opens OpenCode Desktop. This is the easiest way to avoid `ECONNREFUSED 127.0.0.1:3000`.
 
+### Factory Droid / Mission / Validation
+
+Factory Droid can also use this proxy as a BYOK/custom OpenAI-compatible model. This is useful when Factory-managed model access is unavailable, but custom models are still allowed.
+
+1. Install Factory Desktop/Droid: [factory.ai/product/desktop](https://factory.ai/product/desktop) or the CLI from [docs.factory.ai](https://docs.factory.ai/cli/getting-started/quickstart).
+2. Start the local proxy:
+
+```powershell
+.\start-proxy.cmd
+```
+
+3. Close Factory Desktop/Droid so it reloads config files after setup.
+4. Run:
+
+```powershell
+.\setup-factory-droid.cmd
+```
+
+The script updates:
+
+- `%USERPROFILE%\.factory\settings.json`;
+- `%USERPROFILE%\.factory\factory-settings.json`;
+- existing `%USERPROFILE%\.factory\missions\*\model-settings.json` files, if present.
+
+It adds these 4 OpenCode Proxy models:
+
+```text
+deepseek-v4-flash-free [OpenCode Proxy]
+mimo-v2.5-free [OpenCode Proxy]
+north-mini-code-free [OpenCode Proxy]
+nemotron-3-ultra-free [OpenCode Proxy]
+```
+
+Defaults:
+
+- normal chat: `deepseek-v4-flash-free`;
+- Mission worker: `mimo-v2.5-free`;
+- Validation worker: `deepseek-v4-flash-free`;
+- Mission/Validation reasoning: `none`, to avoid sending extra reasoning parameters to the free OpenAI-compatible endpoint.
+
+Reopen Factory afterwards. Normal chat and Mission should show models with the `[OpenCode Proxy]` suffix.
+
+If an existing Mission still shows an old validation model, check:
+
+```text
+%USERPROFILE%\.factory\missions\<mission-id>\model-settings.json
+```
+
+Expected values:
+
+```json
+{
+  "workerModel": "custom:opencode-mimo-v2-5-free",
+  "workerReasoningEffort": "none",
+  "validationWorkerModel": "custom:opencode-deepseek-v4-flash-free",
+  "validationWorkerReasoningEffort": "none"
+}
+```
+
+Proxy check:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/health
+```
+
 ### Separate setup
 
 If you prefer separate steps:
@@ -358,7 +497,7 @@ Current observed limits:
 http://127.0.0.1:3000/limits
 ```
 
-The dashboard shows 4 primary models, requests, tokens/minute, average latency, errors, daily usage, and limits. When the upstream returns `Retry-After`, reset headers, or remaining/limit headers, the dashboard displays those values. If the upstream does not return an exact remaining quota, it shows `API не передал` and uses local daily history for observed usage.
+The dashboard shows 4 primary models, requests, tokens/minute, average latency, errors, daily usage, and limits. When the upstream returns `Retry-After`, reset headers, or remaining/limit headers, the dashboard displays those values. If the upstream does not return an exact remaining quota, it shows `API не передал` and uses local daily history for observed usage. If the upstream does not return `usage`, the proxy estimates tokens from request/response text length and marks them with the `≈` prefix.
 
 Usage history is written by default to:
 
@@ -420,6 +559,15 @@ Environment variables:
 The current version has no npm dependencies: Node.js 18+ is enough, using built-in `http` and `fetch`. Python is not required.
 
 A Rust version is still a good next step for a single `.exe` launcher/doctor, autostart, or tray/service mode. The proxy would still need crates for HTTPS, JSON, and OpenAI-compatible routing; they would just be bundled into the binary.
+
+### Next improvements
+
+- Release zip without binaries: sources, `.cmd`, `.ps1`, README, and tests. This is easier to audit than an unknown `.exe`.
+- Protected server fallback through `ssh -L` if local DNS/network access is unstable.
+- Dashboard JSON/CSV export for usage reports.
+- Cleanup command for old `%USERPROFILE%\.config\opencode-proxy\usage.jsonl` history.
+- Calibration for approximate token estimates when the upstream does not return `usage`.
+- Optional Rust helper later: launcher/doctor only, not the default install path.
 
 ### Risks and limits
 

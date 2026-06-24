@@ -14,7 +14,7 @@ This project should stay small, local-first, and safe by default. The goal is to
 
 ## Useful patterns from nearby projects
 
-From `neurogate-limit-watch`:
+From a local limit-watch side project:
 
 - `--json` and `--compact` outputs for automation, widgets, and quick support.
 - A no-secret diagnostic flow that checks environment, config, and live health.

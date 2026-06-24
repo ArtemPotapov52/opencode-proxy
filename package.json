@@ -10,6 +10,7 @@
     "doctor": "node scripts/doctor.mjs",
     "model-health": "node scripts/model-health.mjs",
     "setup:opencode": "node scripts/setup-opencode.mjs",
+    "setup:factory": "node scripts/setup-factory-droid.mjs",
     "test": "node --test tests/*.test.js"
   },
   "keywords": ["opencode", "zen", "proxy", "ai", "models"],
