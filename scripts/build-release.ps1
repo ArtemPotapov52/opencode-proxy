@@ -33,6 +33,7 @@ try {
     "doctor.cmd",
     "doctor-factory.cmd",
     "model-health.cmd",
+    "proxy-status.cmd",
     "start-proxy.cmd",
     "open-opencode.cmd",
     "run-opencode-proxy.cmd",
