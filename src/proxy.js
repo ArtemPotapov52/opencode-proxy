@@ -4,6 +4,8 @@ import { ProxyMetrics, extractLimitFromHeaders, extractUsageFromBody, extractUsa
 import { Router } from './router.js';
 import { UsageStore } from './usage_store.js';
 
+const DEFAULT_MAX_BODY_BYTES = 2 * 1024 * 1024;
+
 const SAFE_UPSTREAM_HEADERS = [
   'retry-after',
   'ratelimit-reset',
@@ -22,6 +24,9 @@ const SAFE_UPSTREAM_HEADERS = [
 
 function createProxy(customConfig) {
   const config = customConfig || loadConfig();
+  const maxBodyBytes = Number.isFinite(config.maxBodyBytes) && config.maxBodyBytes > 0
+    ? config.maxBodyBytes
+    : DEFAULT_MAX_BODY_BYTES;
   const router = new Router(config.models, config.routing);
   const usageStore = Object.hasOwn(config, 'usageDbPath')
     ? new UsageStore({ path: config.usageDbPath, retentionDays: config.usageRetentionDays })
@@ -125,9 +130,20 @@ function createProxy(customConfig) {
       return;
     }
 
-    let body = '';
-    for await (const chunk of req) {
-      body += chunk;
+    let body;
+    try {
+      body = await readRequestBody(req, maxBodyBytes);
+    } catch (error) {
+      if (error?.code === 'REQUEST_BODY_TOO_LARGE') {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        req.destroy?.();
+        return;
+      }
+
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to read request body' }));
+      return;
     }
 
     let parsed;
@@ -143,9 +159,14 @@ function createProxy(customConfig) {
     parsed.model = selectedModel;
     const startedAt = Date.now();
     let timer;
+    let abortOnClose;
 
     try {
       const controller = new AbortController();
+      abortOnClose = () => {
+        if (!res.writableEnded) controller.abort();
+      };
+      req.on?.('close', abortOnClose);
       timer = setTimeout(() => controller.abort(), config.timeout);
 
       const upstreamUrl = `${config.upstream}/chat/completions`;
@@ -159,6 +180,7 @@ function createProxy(customConfig) {
         body: JSON.stringify(parsed),
       });
       clearTimeout(timer);
+      timer = null;
 
       const text = await response.text();
       const parsedResponse = safeParseJSON(text);
@@ -198,10 +220,30 @@ function createProxy(customConfig) {
       });
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Upstream request failed', message }));
+    } finally {
+      if (abortOnClose) req.off?.('close', abortOnClose);
     }
   }
 
   return { proxyRequest, config, router, metrics };
+}
+
+async function readRequestBody(req, maxBodyBytes = DEFAULT_MAX_BODY_BYTES) {
+  const chunks = [];
+  let totalBytes = 0;
+
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > maxBodyBytes) {
+      const error = new Error('Request body too large');
+      error.code = 'REQUEST_BODY_TOO_LARGE';
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 function safeParseJSON(text) {
@@ -289,8 +331,9 @@ function usageCsvRow(day, model, item) {
 
 function csvCell(value) {
   const text = String(value ?? '');
-  if (!/[",\r\n]/.test(text)) return text;
-  return `"${text.replace(/"/g, '""')}"`;
+  const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  if (!/[",\r\n]/.test(safeText)) return safeText;
+  return `"${safeText.replace(/"/g, '""')}"`;
 }
 
-export { createProxy, usageExportCsv };
+export { createProxy, readRequestBody, usageExportCsv };

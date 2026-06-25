@@ -616,7 +616,7 @@ function renderDashboard() {
       </div>
       <div class="stat-card">
         <div class="stat-card-top">
-          <div class="stat-label">Токены / мин</div>
+          <div class="stat-label">Токены сегодня</div>
           <div class="stat-icon tokens"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         </div>
         <div class="stat-value" id="tpm">0</div>
@@ -862,6 +862,12 @@ function renderDashboard() {
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
+    function statusDot() {
+      const dot = document.createElement('span');
+      dot.className = 'status-dot';
+      return dot;
+    }
+
     function renderRows(rows, empty, mapper) {
       if (!rows || !rows.length) return empty;
       return rows.map(mapper).join('');
@@ -1092,7 +1098,7 @@ function renderDashboard() {
       const reset = item.reset_at ? 'Сброс через ' + formatDuration(item.reset_in_seconds) : resetFallback(state, item);
       const quota = formatQuota(item);
       const percent = quotaPercent(item);
-      const barClass = percent == null ? 'progress-track' : 'progress-track';
+      const barClass = 'progress-track';
       const fillClass = percent == null ? 'unknown' : (state === 'limited' ? 'bad' : 'good');
       const previousText = previous
         ? previous.day + ': ' + fmt.format(previous.requests) + ' / ' + tokenText(previous)
@@ -1165,6 +1171,18 @@ function renderDashboard() {
       return '—';
     }
 
+    function todayUsage(usage) {
+      const rows = usage.by_day || [];
+      return rows.find((row) => row.day === usage.today) || rows[0] || {};
+    }
+
+    function tokenRateText(summary) {
+      const usageKnown = summary.requests === 0 || summary.usage_reported > 0 || summary.usage_estimated > 0;
+      if (!usageKnown) return 'usage не передан';
+      const usageApprox = summary.usage_estimated > 0 && summary.usage_reported === 0;
+      return (usageApprox ? '≈' : '') + formatShortNum(summary.tokens_per_minute) + ' ток/мин';
+    }
+
     function quotaPercent(item) {
       if (item.rate_limit_remaining == null || item.rate_limit_limit == null || item.rate_limit_limit <= 0) return null;
       return Math.max(0, Math.min(100, Math.round((item.rate_limit_remaining / item.rate_limit_limit) * 100)));
@@ -1193,32 +1211,25 @@ function renderDashboard() {
         const s = data.summary.window;
         const all = data.summary.all;
         const usage = data.usage || {};
+        const today = todayUsage(usage);
         const ts = data.timeseries || [];
 
         const pill = $('status');
         pill.classList.remove('error');
         pill.innerHTML = '<span class="status-dot"></span> ' + new Date(data.generated_at).toLocaleTimeString('ru-RU') + ' · uptime ' + formatDuration(data.uptime_seconds);
         setText('requests', fmtInt.format(s.requests));
-        setText('rpm', fmt.format(s.requests_per_minute) + ' rpm');
-        const usageKnown = s.requests === 0 || s.usage_reported > 0 || s.usage_estimated > 0;
-        const usageApprox = s.usage_estimated > 0 && s.usage_reported === 0;
-        setText('tpm', usageKnown ? (usageApprox ? '≈' : '') + formatShortNum(s.tokens_per_minute) : 'н/д');
-        setText('tokens', usageKnown ? (usageApprox ? '≈' : '') + fmt.format(s.total_tokens) + ' токенов' : 'usage не передан');
+        setText('rpm', fmt.format(s.requests_per_minute) + ' rpm · сегодня ' + fmtInt.format(today.requests || 0));
+        setText('tpm', tokenText(today));
+        setText('tokens', '5 мин: ' + tokenRateText(s));
         setText('latency', fmtInt.format(s.latency_ms_avg) + 'мс');
         setText('maxLatency', 'max ' + fmtInt.format(s.latency_ms_max) + 'мс');
         setText('errors', fmtInt.format(s.fail));
         setText('success', fmt.format(s.ok) + ' ok');
-        setText('cost', '$' + money.format(all.cost || 0));
-        setText('costToday', '$' + money.format(usage.totals?.cost || 0) + ' за 7д');
+        setText('cost', '$' + money.format(today.cost || 0));
+        setText('costToday', '$' + money.format(usage.totals?.cost || all.cost || 0) + ' за 7д');
 
         const primaryModels = (data.model_status && data.model_status.primary) || [];
         $('modelCards').innerHTML = renderRows(primaryModels, '<div class="empty-state">Нет моделей</div>', renderModelCard);
-
-        const activeLimits = (data.limits || []).filter((item) => item.limited);
-        const nextLimit = activeLimits.find((item) => item.reset_at);
-        if (nextLimit) {
-        } else if (activeLimits.length) {
-        }
 
         $('limits').innerHTML = renderRows(data.limits, '<tr><td colspan="6" class="empty-state">Активных лимитов нет</td></tr>', (limit) => {
           const reset = limit.reset_at ? new Date(limit.reset_at).toLocaleString('ru-RU') : '—';
@@ -1240,7 +1251,7 @@ function renderDashboard() {
         $('recent').innerHTML = renderRows(data.recent, '<tr><td colspan="8" class="empty-state">Запросов нет</td></tr>', (e) => {
           const statusClass = e.ok ? 'ok' : 'fail';
           const detail = e.ok ? e.finish_reason : e.error_type;
-          return '<tr><td>' + new Date(e.ts).toLocaleTimeString('ru-RU') + '</td><td>' + escapeHtml(e.model) + '</td><td class="' + statusClass + '">' + e.status + '</td><td class="right">' + fmtInt.format(e.latency_ms) + 'мс</td><td class="right">' + escapeHtml(tokenText(e)) + '</td><td class="right">' + escapeHtml(tokenPartText(e, 'prompt_tokens')) + '</td><td class="right">' + escapeHtml(tokenPartText(e, 'completion_tokens')) + '</td><td>' + escapeHtml(detail || '') + '</td></tr>';
+          return '<tr><td>' + new Date(e.ts).toLocaleTimeString('ru-RU') + '</td><td>' + escapeHtml(e.model) + '</td><td class="' + statusClass + '">' + escapeHtml(String(e.status)) + '</td><td class="right">' + fmtInt.format(e.latency_ms) + 'мс</td><td class="right">' + escapeHtml(tokenText(e)) + '</td><td class="right">' + escapeHtml(tokenPartText(e, 'prompt_tokens')) + '</td><td class="right">' + escapeHtml(tokenPartText(e, 'completion_tokens')) + '</td><td>' + escapeHtml(detail || '') + '</td></tr>';
         });
 
         if (ts.length > 0 && hasCharts()) {
@@ -1251,10 +1262,16 @@ function renderDashboard() {
         }
 
         const modelAgg = {};
-        for (const b of ts) {
-          for (const [model, agg] of Object.entries(b.by_model || {})) {
-            if (!modelAgg[model]) modelAgg[model] = 0;
-            modelAgg[model] += agg.requests || 0;
+        for (const row of todayRows) {
+          if (!modelAgg[row.model]) modelAgg[row.model] = 0;
+          modelAgg[row.model] += row.requests || 0;
+        }
+        if (Object.keys(modelAgg).length === 0) {
+          for (const b of ts) {
+            for (const [model, agg] of Object.entries(b.by_model || {})) {
+              if (!modelAgg[model]) modelAgg[model] = 0;
+              modelAgg[model] += agg.requests || 0;
+            }
           }
         }
         const modelLabels = Object.keys(modelAgg).sort((a, b) => modelAgg[b] - modelAgg[a]);
@@ -1262,11 +1279,18 @@ function renderDashboard() {
         updateDonut('modelDonut', 'modelLegend', 'modelDonutTotal', modelLabels, modelData, CHART_COLORS.slice(0, modelLabels.length));
 
         let totalPrompt = 0, totalCompletion = 0;
-        for (const b of ts) { totalPrompt += b.prompt_tokens || 0; totalCompletion += b.completion_tokens || 0; }
+        if (today.requests) {
+          totalPrompt = today.prompt_tokens || 0;
+          totalCompletion = today.completion_tokens || 0;
+        } else {
+          for (const b of ts) { totalPrompt += b.prompt_tokens || 0; totalCompletion += b.completion_tokens || 0; }
+        }
         updateDonut('tokenDonut', 'tokenLegend', 'tokenDonutTotal', ['Prompt', 'Completion'], [totalPrompt, totalCompletion], ['#6366f1', '#10b981']);
 
-        let totalOk = 0, totalFail = 0, totalRateLimited = 0;
-        for (const b of ts) { totalOk += b.ok || 0; totalFail += b.fail || 0; totalRateLimited += b.rate_limited || 0; }
+        let totalOk = today.ok || 0, totalFail = today.fail || 0, totalRateLimited = today.rate_limited || 0;
+        if (!today.requests) {
+          for (const b of ts) { totalOk += b.ok || 0; totalFail += b.fail || 0; totalRateLimited += b.rate_limited || 0; }
+        }
         updateDonut('successDonut', 'successLegend', 'successDonutTotal', ['OK', 'Ошибки', '429'], [totalOk, totalFail, totalRateLimited], ['#10b981', '#f43f5e', '#f59e0b']);
 
         const dbState = usage.enabled ? (usage.path || 'usage.jsonl') : 'только RAM';
@@ -1274,7 +1298,7 @@ function renderDashboard() {
       } catch (error) {
         const pill = $('status');
         pill.classList.add('error');
-        pill.innerHTML = '<span class="status-dot"></span> Ошибка: ' + error.message;
+        pill.replaceChildren(statusDot(), document.createTextNode(' Ошибка: ' + error.message));
       }
     }
 
@@ -1298,7 +1322,9 @@ function renderDashboard() {
     $('refresh').addEventListener('click', refresh);
 
     const savedTheme = localStorage.getItem('oc-dash-theme');
-    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
 
     initCharts();
     refresh();

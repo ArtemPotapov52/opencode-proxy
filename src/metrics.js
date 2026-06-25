@@ -135,6 +135,7 @@ class ProxyMetrics {
     this.startedAt = Date.now();
     this.events = [];
     this.timeseries = [];
+    this.timeseriesByMinute = new Map();
     this.models = Array.isArray(options.models) ? uniqueStrings(options.models) : [];
     this.primaryModels = Array.isArray(options.primaryModels)
       ? uniqueStrings(options.primaryModels).slice(0, 4)
@@ -144,7 +145,7 @@ class ProxyMetrics {
 
   record(event) {
     const safeEvent = {
-      ts: event.ts || Date.now(),
+      ts: event.ts ?? Date.now(),
       model: String(event.model || 'unknown'),
       returned_model: event.returned_model ? String(event.returned_model) : '',
       status: Number(event.status || 0),
@@ -180,9 +181,9 @@ class ProxyMetrics {
 
   _updateTimeseries(event) {
     const minuteTs = Math.floor(event.ts / 60000) * 60000;
-    let bucket = this.timeseries.length > 0 ? this.timeseries[this.timeseries.length - 1] : null;
+    let bucket = this.timeseriesByMinute.get(minuteTs);
 
-    if (!bucket || bucket.ts !== minuteTs) {
+    if (!bucket) {
       bucket = {
         ts: minuteTs,
         requests: 0,
@@ -199,9 +200,16 @@ class ProxyMetrics {
         rate_limited: 0,
         by_model: {},
       };
-      this.timeseries.push(bucket);
+      this.timeseriesByMinute.set(minuteTs, bucket);
+      const insertAt = this.timeseries.findIndex((item) => item.ts > minuteTs);
+      if (insertAt === -1) this.timeseries.push(bucket);
+      else this.timeseries.splice(insertAt, 0, bucket);
+
       if (this.timeseries.length > this.maxTimeseriesPoints) {
-        this.timeseries.splice(0, this.timeseries.length - this.maxTimeseriesPoints);
+        const removed = this.timeseries.splice(0, this.timeseries.length - this.maxTimeseriesPoints);
+        for (const item of removed) {
+          this.timeseriesByMinute.delete(item.ts);
+        }
       }
     }
 

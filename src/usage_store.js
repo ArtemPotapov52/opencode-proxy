@@ -6,7 +6,9 @@ import {
   openSync,
   readFileSync,
   readSync,
+  renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
@@ -92,13 +94,28 @@ class UsageStore {
 
     try {
       const text = kept.length ? `${kept.map((event) => JSON.stringify(event)).join('\n')}\n` : '';
-      writeFileSync(this.path, text, 'utf8');
+      atomicWriteFile(this.path, text);
       this.lastError = '';
       return true;
     } catch (error) {
       this.lastError = error?.message || String(error);
       return false;
     }
+  }
+}
+
+function atomicWriteFile(filePath, text) {
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  try {
+    writeFileSync(tmpPath, text, 'utf8');
+    renameSync(tmpPath, filePath);
+  } catch (error) {
+    try {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
+    } catch {
+      // Keep the original write error as the caller-visible failure.
+    }
+    throw error;
   }
 }
 

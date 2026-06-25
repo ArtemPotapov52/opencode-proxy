@@ -497,6 +497,54 @@ Factory Droid check:
 .\doctor-factory.cmd
 ```
 
+### VibeMode URL migration
+
+NeuroGate was rebranded to VibeMode. Existing Factory custom models that still
+point to `https://api.neurogate.space/v1` should be migrated to the new
+OpenAI-compatible endpoint. The default below uses the no-VPN URL:
+
+```powershell
+.\update-vibemode-factory.cmd
+```
+
+To use the VPN URL instead:
+
+```powershell
+.\update-vibemode-factory.cmd --base-url https://api.vibemod.pro/v1
+```
+
+The migration keeps existing API keys, writes backups next to the Factory config
+files, and updates VibeMode model `baseUrl` values in:
+
+- `%USERPROFILE%\.factory\settings.json`;
+- `%USERPROFILE%\.factory\factory-settings.json`.
+
+### Factory Settings Backup
+
+Before changing Factory/Droid settings, save a local rollback point:
+
+```powershell
+.\factory-settings-backup.cmd backup --label before-change
+```
+
+List saved backups:
+
+```powershell
+.\factory-settings-backup.cmd list
+```
+
+Restore a backup:
+
+```powershell
+.\factory-settings-backup.cmd restore <backup-id> --yes
+```
+
+Backups are stored under `%USERPROFILE%\.factory\backups` by default. They include
+Factory settings, computer registration metadata, and Mission model settings.
+They intentionally do not include `auth.v2.file`, `auth.v2.key`, logs, sessions,
+or SSH keys. The settings files can contain BYOK API keys, so keep this backup
+directory local and do not copy it into a git repository.
+
 ### Separate setup
 
 If you prefer separate steps:

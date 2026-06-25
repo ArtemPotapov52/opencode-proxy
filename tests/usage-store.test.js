@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UsageStore, localDay } from '../src/usage_store.js';
@@ -66,7 +66,7 @@ describe('UsageStore', () => {
   });
 
   it('prunes events outside the retention window', () => {
-    const { store, path } = makeStore({ retentionDays: 2, pruneIntervalMs: 1 });
+    const { dir, store, path } = makeStore({ retentionDays: 2, pruneIntervalMs: 1 });
     const today = new Date(2026, 5, 23, 12, 0, 0).getTime();
     const old = new Date(2026, 5, 20, 12, 0, 0).getTime();
 
@@ -77,6 +77,7 @@ describe('UsageStore', () => {
     const text = readFileSync(path, 'utf8');
     assert.equal(text.includes('old-model'), false);
     assert.equal(text.includes('new-model'), true);
+    assert.equal(readdirSync(dir).some((name) => name.includes('.tmp.')), false);
   });
 
   it('cleans usage log through the command helper', () => {
@@ -102,6 +103,7 @@ function makeStore(options = {}) {
   tempDirs.push(dir);
   const path = join(dir, 'usage.jsonl');
   return {
+    dir,
     path,
     store: new UsageStore({ path, retentionDays: 7, ...options }),
   };

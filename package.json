@@ -15,6 +15,8 @@
     "release:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "setup:opencode": "node scripts/setup-opencode.mjs",
     "setup:factory": "node scripts/setup-factory-droid.mjs",
+    "setup:vibemode": "node scripts/update-vibemode-factory.mjs",
+    "factory:backup": "node scripts/factory-settings-backup.mjs backup",
     "test": "node --test tests/*.test.js"
   },
   "keywords": ["opencode", "zen", "proxy", "ai", "models"],

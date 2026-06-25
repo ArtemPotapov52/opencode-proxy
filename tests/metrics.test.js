@@ -112,6 +112,23 @@ describe('ProxyMetrics', () => {
     assert.deepEqual(snapshot.recent.map((event) => event.model), ['c', 'b']);
   });
 
+  it('merges out-of-order events into existing minute buckets', () => {
+    const metrics = new ProxyMetrics({ maxTimeseriesPoints: 10 });
+    const base = Date.parse('2026-06-23T12:00:30.000Z');
+
+    metrics.record({ ts: base + 60_000, model: 'a', ok: true, total_tokens: 10 });
+    metrics.record({ ts: base, model: 'a', ok: true, total_tokens: 20 });
+    metrics.record({ ts: base + 10_000, model: 'b', ok: false, total_tokens: 0 });
+
+    const snapshot = metrics.snapshot();
+    assert.equal(snapshot.timeseries.length, 2);
+    assert.equal(snapshot.timeseries[0].requests, 2);
+    assert.equal(snapshot.timeseries[0].total_tokens, 20);
+    assert.equal(snapshot.timeseries[0].by_model.a.requests, 1);
+    assert.equal(snapshot.timeseries[0].by_model.b.requests, 1);
+    assert.equal(snapshot.timeseries[1].requests, 1);
+  });
+
   it('parses retry-after seconds into reset time', () => {
     const now = Date.parse('2026-06-23T12:00:00.000Z');
     assert.deepEqual(parseRetryAfter('120', now), {

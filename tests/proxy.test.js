@@ -236,6 +236,13 @@ describe('createProxy', () => {
       completion_tokens: 4,
       messages: [{ role: 'user', content: 'secret prompt' }],
     });
+    metrics.record({
+      model: '=cmd',
+      status: 200,
+      ok: true,
+      latency_ms: 1,
+      total_tokens: 1,
+    });
 
     const json = makeResponse(true);
     await proxyRequest({ method: 'GET', url: '/export/usage.json?days=1' }, json);
@@ -249,7 +256,60 @@ describe('createProxy', () => {
     assert.equal(csv.statusCode, 200);
     assert.match(csv.body, /day,model,requests,ok,fail,total_tokens/);
     assert.match(csv.body, /m1/);
+    assert.match(csv.body, /'=cmd/);
     assert.equal(csv.body.includes('secret prompt'), false);
+  });
+
+  it('should reject oversized chat request bodies before upstream fetch', async () => {
+    const originalFetch = globalThis.fetch;
+    let fetched = false;
+    globalThis.fetch = async () => {
+      fetched = true;
+      return new Response('{}', { status: 200 });
+    };
+
+    try {
+      const { proxyRequest } = createProxy({
+        apiKey: 'key',
+        models: ['m1'],
+        upstream: 'https://test.com/v1',
+        timeout: 5000,
+        maxBodyBytes: 8,
+      });
+
+      const req = makeChunkRequest('/v1/chat/completions', [Buffer.from('123456789')]);
+      const res = makeResponse(true);
+      await proxyRequest(req, res);
+
+      assert.equal(res.statusCode, 413);
+      assert.equal(res.body.error, 'Request body too large');
+      assert.equal(fetched, false);
+      assert.equal(req.destroyed, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('should handle request body stream read failures', async () => {
+    const { proxyRequest } = createProxy({
+      apiKey: 'key',
+      models: ['m1'],
+      upstream: 'https://test.com/v1',
+      timeout: 5000,
+    });
+
+    const req = {
+      method: 'POST',
+      url: '/v1/chat/completions',
+      async *[Symbol.asyncIterator]() {
+        throw new Error('socket failed');
+      },
+    };
+    const res = makeResponse(true);
+    await proxyRequest(req, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error, 'Failed to read request body');
   });
 
   it('should record privacy-safe metrics for chat completions', async () => {
@@ -378,6 +438,63 @@ describe('createProxy', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('should show persisted usage after proxy restart', async () => {
+    const originalFetch = globalThis.fetch;
+    const dir = mkdtempSync(join(tmpdir(), 'opencode-proxy-restart-'));
+    const usageDbPath = join(dir, 'usage.jsonl');
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      model: 'actual-model',
+      choices: [{ finish_reason: 'stop', message: { content: 'do not store me' } }],
+      usage: {
+        prompt_tokens: 13,
+        completion_tokens: 7,
+        total_tokens: 20,
+      },
+      cost: '0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+    try {
+      const first = createProxy({
+        apiKey: 'key',
+        models: ['m1'],
+        primaryModels: ['m1'],
+        upstream: 'https://test.com/v1',
+        timeout: 5000,
+        usageDbPath,
+        usageRetentionDays: 7,
+      });
+
+      await first.proxyRequest(makeJSONRequest('/v1/chat/completions', {
+        model: 'm1',
+        messages: [{ role: 'user', content: 'secret prompt' }],
+      }), makeResponse());
+
+      const restarted = createProxy({
+        apiKey: 'key',
+        models: ['m1'],
+        primaryModels: ['m1'],
+        upstream: 'https://test.com/v1',
+        timeout: 5000,
+        usageDbPath,
+        usageRetentionDays: 7,
+      });
+
+      const metrics = makeResponse(true);
+      await restarted.proxyRequest({ method: 'GET', url: '/metrics?window=60000&days=7' }, metrics);
+
+      assert.equal(metrics.body.summary.window.requests, 0);
+      const today = metrics.body.usage.by_model_today.find((item) => item.model === 'm1');
+      assert.equal(today.requests, 1);
+      assert.equal(today.total_tokens, 20);
+      assert.equal(today.prompt_tokens, 13);
+      assert.equal(today.completion_tokens, 7);
+      assert.equal(metrics.body.model_status.primary[0].today.total_tokens, 20);
+    } finally {
+      globalThis.fetch = originalFetch;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 function makeResponse(parseJSON = false) {
@@ -399,6 +516,20 @@ function makeJSONRequest(url, body) {
     url,
     async *[Symbol.asyncIterator]() {
       yield Buffer.from(JSON.stringify(body));
+    },
+  };
+}
+
+function makeChunkRequest(url, chunks) {
+  return {
+    method: 'POST',
+    url,
+    destroyed: false,
+    destroy() {
+      this.destroyed = true;
+    },
+    async *[Symbol.asyncIterator]() {
+      for (const chunk of chunks) yield chunk;
     },
   };
 }
