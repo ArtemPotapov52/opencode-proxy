@@ -7,6 +7,17 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "doctor": "node scripts/doctor.mjs",
+    "doctor:factory": "node scripts/doctor-factory.mjs",
+    "model-health": "node scripts/model-health.mjs",
+    "proxy-status": "node scripts/proxy-status.mjs",
+    "cleanup:usage": "node scripts/cleanup-usage.mjs",
+    "secret-scan": "node scripts/secret-scan.mjs",
+    "release:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "setup:opencode": "node scripts/setup-opencode.mjs",
+    "setup:factory": "node scripts/setup-factory-droid.mjs",
+    "setup:vibemode": "node scripts/update-vibemode-factory.mjs",
+    "factory:backup": "node scripts/factory-settings-backup.mjs backup",
     "test": "node --test tests/*.test.js"
   },
   "keywords": ["opencode", "zen", "proxy", "ai", "models"],
